@@ -12,14 +12,20 @@ import type { User } from "@supabase/supabase-js";
 export async function requireAdmin(): Promise<User> {
   const supabase = createClient();
 
+  // Deliberately not checking the `error` field getUser() returns
+  // alongside `user`: Supabase's client populates it with an
+  // AuthSessionMissingError for the entirely normal case of "no active
+  // session" (any anonymous visit, or an expired session) — that's not a
+  // real failure, it's the expected signal to redirect to /login. Throwing
+  // on it turned every logged-out visit to /admin into a hard error. `user`
+  // being null/non-null is the only signal that matters here, exactly like
+  // middleware.ts already (correctly) treats it. A genuine configuration
+  // problem — a missing or malformed Supabase URL/key — still throws
+  // clearly, just earlier: requireEnv() in lib/supabase/server.ts catches
+  // that before this function is ever reached.
   const {
     data: { user },
-    error: userError,
   } = await supabase.auth.getUser();
-
-  if (userError) {
-    throw new Error(`Failed to verify your session: ${userError.message}`);
-  }
 
   if (!user) {
     redirect("/login");
