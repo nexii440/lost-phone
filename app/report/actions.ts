@@ -29,6 +29,7 @@ export async function submitReport(
     device_type: formData.get("device_type"),
     brand: formData.get("brand"),
     model: formData.get("model"),
+    imei: formData.get("imei"),
     color: formData.get("color"),
     last_seen_location: formData.get("last_seen_location"),
     last_seen_date: formData.get("last_seen_date"),

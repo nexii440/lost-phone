@@ -2,6 +2,11 @@
 -- Run this once, in full, in the Supabase SQL Editor on a fresh project.
 -- Safe to re-run: every statement is idempotent (create-if-not-exists /
 -- create-or-replace / on-conflict-do-nothing).
+--
+-- Already ran this once against a project that has data in it? This file's
+-- `create table if not exists` won't retroactively add new columns to an
+-- existing table (e.g. `imei`, added after Phase 1 shipped) — run the
+-- numbered files in supabase/migrations/ in order instead.
 
 create extension if not exists pgcrypto;
 
@@ -28,6 +33,11 @@ create table if not exists public.cases (
   device_type text not null,
   brand text not null,
   model text,
+  -- Required at the application layer (lib/validation.ts / the report
+  -- form); nullable here so it never blocks a direct/manual insert, and so
+  -- this column definition matches migrations/0002 exactly for projects
+  -- that added it after cases already had rows.
+  imei text,
   color text,
   last_seen_location text not null,
   last_seen_date date not null,
@@ -36,11 +46,14 @@ create table if not exists public.cases (
   contact_phone text,
   status text not null default 'open' check (status in ('open', 'found', 'closed')),
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  constraint cases_imei_format_check check (imei is null or imei ~ '^[0-9]{15}$')
 );
 
 create index if not exists cases_created_at_idx on public.cases (created_at desc);
 create index if not exists cases_status_idx on public.cases (status);
+-- Supports the admin dashboard's "search by IMEI" feature.
+create index if not exists cases_imei_idx on public.cases (imei);
 
 -- ---------------------------------------------------------------------------
 -- case_files — optional photo(s) attached to a report. Actual bytes live in

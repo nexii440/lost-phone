@@ -1,5 +1,6 @@
 import { cookies } from "next/headers";
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
+import { requireEnv } from "@/lib/env";
 
 /**
  * Anon-key Supabase client wired to the Next.js cookie store, for use in
@@ -15,8 +16,8 @@ export function createClient() {
   const cookieStore = cookies();
 
   return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    requireEnv("NEXT_PUBLIC_SUPABASE_URL"),
+    requireEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY"),
     {
       cookies: {
         get(name: string) {

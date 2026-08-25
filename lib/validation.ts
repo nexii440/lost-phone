@@ -21,6 +21,11 @@ export const reportSchema = z.object({
     .max(80, "Keep it under 80 characters.")
     .optional()
     .transform((v) => (v ? v : null)),
+  imei: z
+    .string()
+    .trim()
+    .min(1, "IMEI is required.")
+    .regex(/^[0-9]{15}$/, "IMEI must be exactly 15 digits, numbers only."),
   color: z
     .string()
     .trim()

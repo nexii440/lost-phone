@@ -1,11 +1,8 @@
-import { createClient } from "@/lib/supabase/server";
+import { requireAdmin } from "@/lib/admin-auth";
 import { signOutAction } from "./actions";
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-  const supabase = createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await requireAdmin();
 
   return (
     <div>

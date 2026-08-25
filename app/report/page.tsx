@@ -78,6 +78,27 @@ export default function ReportPage() {
         </div>
 
         <div>
+          <label htmlFor="imei" className="block text-sm font-medium text-ink-950">
+            IMEI Number
+          </label>
+          <input
+            id="imei"
+            name="imei"
+            required
+            inputMode="numeric"
+            pattern="[0-9]{15}"
+            maxLength={15}
+            title="Enter exactly 15 digits, numbers only."
+            placeholder="Enter 15-digit IMEI"
+            className="mt-1.5 w-full rounded-md border border-ink-800/20 bg-white px-3 py-2 font-mono text-ink-950 placeholder:font-sans placeholder:text-ink-500/60 focus:border-flare-500 focus:outline-none"
+          />
+          {errors.imei && <p className="mt-1 text-sm text-flare-600">{errors.imei}</p>}
+          <p className="mt-1 text-xs text-ink-500">
+            Dial <span className="font-mono">*#06#</span> on the device to find its IMEI.
+          </p>
+        </div>
+
+        <div>
           <label htmlFor="color" className="block text-sm font-medium text-ink-950">
             Color <span className="text-ink-500">(optional)</span>
           </label>
