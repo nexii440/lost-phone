@@ -148,6 +148,14 @@ create policy "admins can update cases"
   using (public.is_admin())
   with check (public.is_admin());
 
+-- cases: only admins may delete a case (used by the admin dashboard's
+-- delete-case action).
+drop policy if exists "admins can delete cases" on public.cases;
+create policy "admins can delete cases"
+  on public.cases for delete
+  to authenticated
+  using (public.is_admin());
+
 -- case_files: anyone may attach a file pointer while filing a report.
 drop policy if exists "anyone can attach a case file" on public.case_files;
 create policy "anyone can attach a case file"
@@ -159,6 +167,16 @@ create policy "anyone can attach a case file"
 drop policy if exists "admins can view case files" on public.case_files;
 create policy "admins can view case files"
   on public.case_files for select
+  to authenticated
+  using (public.is_admin());
+
+-- case_files: only admins may delete file records. Required for deleting
+-- a case to succeed: the ON DELETE CASCADE from cases to case_files is
+-- itself subject to RLS on case_files, so without this policy a cascading
+-- delete would be silently blocked.
+drop policy if exists "admins can delete case files" on public.case_files;
+create policy "admins can delete case files"
+  on public.case_files for delete
   to authenticated
   using (public.is_admin());
 

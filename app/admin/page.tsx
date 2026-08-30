@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { isCaseStatus } from "@/lib/status";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -123,7 +124,14 @@ export default async function AdminDashboardPage({
             <tbody>
               {cases.map((c) => (
                 <tr key={c.case_id} className="border-b border-ink-800/5 last:border-0">
-                  <td className="px-4 py-3 font-mono text-ink-950">{c.case_id}</td>
+                  <td className="px-4 py-3 font-mono text-ink-950">
+                    <Link
+                      href={`/admin/cases/${encodeURIComponent(c.case_id)}`}
+                      className="hover:text-flare-600 hover:underline"
+                    >
+                      {c.case_id}
+                    </Link>
+                  </td>
                   <td className="px-4 py-3 text-ink-800">
                     {[c.brand, c.model].filter(Boolean).join(" ")}{" "}
                     <span className="text-ink-500">({c.device_type})</span>
