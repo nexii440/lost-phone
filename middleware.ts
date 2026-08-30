@@ -42,9 +42,21 @@ export async function middleware(request: NextRequest) {
       },
     });
 
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
+    // getUser() is wrapped at this exact call site — not just relying on
+    // the outer try/catch — because Supabase's client can signal "no
+    // active session" (AuthSessionMissingError) either as a returned
+    // `error` field OR, in some runtimes, as a thrown exception. Either
+    // form means the same ordinary thing here: no one is signed in. Both
+    // are treated identically as user = null, never as a failure.
+    let user = null;
+    try {
+      const {
+        data: { user: fetchedUser },
+      } = await supabase.auth.getUser();
+      user = fetchedUser;
+    } catch {
+      user = null;
+    }
 
     const isAdminRoute = request.nextUrl.pathname.startsWith("/admin");
     const isLoginRoute = request.nextUrl.pathname === "/login";
@@ -72,7 +84,11 @@ export async function middleware(request: NextRequest) {
       }
 
       if (!adminRow) {
-        await supabase.auth.signOut();
+        try {
+          await supabase.auth.signOut();
+        } catch {
+          // Best-effort — still redirect below even if sign-out itself fails.
+        }
         const redirectUrl = new URL("/login", request.url);
         redirectUrl.searchParams.set("error", "not_authorized");
         return NextResponse.redirect(redirectUrl);

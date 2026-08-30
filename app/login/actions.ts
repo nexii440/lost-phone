@@ -22,9 +22,22 @@ export async function signIn(
   }
 
   const supabase = createClient();
-  const { error } = await supabase.auth.signInWithPassword(parsed.data);
 
-  if (error) {
+  // Wrapped explicitly: signInWithPassword() normally returns a graceful
+  // { error } for wrong credentials (handled below), but an unexpected
+  // failure (a transient network issue reaching Supabase, for example)
+  // could throw instead. Either way the user should see the same plain
+  // "couldn't sign in, try again" message — never an uncaught Server
+  // Action error.
+  let signInError: { message: string } | null = null;
+  try {
+    const { error } = await supabase.auth.signInWithPassword(parsed.data);
+    signInError = error;
+  } catch {
+    signInError = { message: "unexpected" };
+  }
+
+  if (signInError) {
     return { error: "Incorrect email or password." };
   }
 

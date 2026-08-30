@@ -12,20 +12,24 @@ import type { User } from "@supabase/supabase-js";
 export async function requireAdmin(): Promise<User> {
   const supabase = createClient();
 
-  // Deliberately not checking the `error` field getUser() returns
-  // alongside `user`: Supabase's client populates it with an
-  // AuthSessionMissingError for the entirely normal case of "no active
-  // session" (any anonymous visit, or an expired session) — that's not a
-  // real failure, it's the expected signal to redirect to /login. Throwing
-  // on it turned every logged-out visit to /admin into a hard error. `user`
-  // being null/non-null is the only signal that matters here, exactly like
-  // middleware.ts already (correctly) treats it. A genuine configuration
-  // problem — a missing or malformed Supabase URL/key — still throws
-  // clearly, just earlier: requireEnv() in lib/supabase/server.ts catches
-  // that before this function is ever reached.
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Deliberately catching here, not just checking a returned `error`
+  // field: Supabase's client can signal "no active session"
+  // (AuthSessionMissingError) either as a returned error OR, in some
+  // runtimes, as a thrown exception. Both mean the same ordinary thing —
+  // no one is signed in — and both must resolve to `user = null` here,
+  // never propagate as an uncaught Server Component error. A genuine
+  // configuration problem (missing/malformed Supabase URL or key) still
+  // throws clearly, just earlier: requireEnv() in lib/supabase/server.ts
+  // catches that before this function is ever reached.
+  let user: User | null = null;
+  try {
+    const {
+      data: { user: fetchedUser },
+    } = await supabase.auth.getUser();
+    user = fetchedUser;
+  } catch {
+    user = null;
+  }
 
   if (!user) {
     redirect("/login");
