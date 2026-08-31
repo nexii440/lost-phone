@@ -14,11 +14,11 @@ import { requireEnv } from "@/lib/env";
  */
 export function createClient() {
   const cookieStore = cookies();
+  const url = requireEnv("NEXT_PUBLIC_SUPABASE_URL");
+  const anonKey = requireEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY");
 
-  return createServerClient(
-    requireEnv("NEXT_PUBLIC_SUPABASE_URL"),
-    requireEnv("NEXT_PUBLIC_SUPABASE_ANON_KEY"),
-    {
+  try {
+    return createServerClient(url, anonKey, {
       cookies: {
         get(name: string) {
           return cookieStore.get(name)?.value;
@@ -38,6 +38,22 @@ export function createClient() {
           }
         },
       },
-    }
-  );
+    });
+  } catch (err) {
+    // requireEnv() above only catches an EMPTY/missing variable — it
+    // returns the string as-is if one is set, even if malformed.
+    // createServerClient() validates the URL itself and throws
+    // synchronously, at construction time, before any call made on the
+    // resulting client is ever reached. This is a genuine configuration
+    // problem (not a "no session" case), so it's rethrown clearly rather
+    // than swallowed — callers that need a graceful, non-throwing outcome
+    // (like a login form) are responsible for catching this themselves.
+    const message = err instanceof Error ? err.message : String(err);
+    throw new Error(
+      `Failed to initialize the Supabase client: ${message}. Check NEXT_PUBLIC_SUPABASE_URL ` +
+        `in Vercel (Project Settings → Environment Variables, Production scope) — it must be ` +
+        `the full URL including the "https://" scheme, e.g. https://your-project-ref.supabase.co, ` +
+        `with no extra whitespace or quotes.`
+    );
+  }
 }
