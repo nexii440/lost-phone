@@ -5,8 +5,9 @@
 --
 -- Already ran this once against a project that has data in it? This file's
 -- `create table if not exists` won't retroactively add new columns to an
--- existing table (e.g. `imei`, added after Phase 1 shipped) — run the
--- numbered files in supabase/migrations/ in order instead.
+-- existing table (e.g. `imei_1`/`imei_2`/`admin_remark`, or the
+-- active/not_active status rename) — run the numbered files in
+-- supabase/migrations/ in order instead.
 
 create extension if not exists pgcrypto;
 
@@ -33,27 +34,35 @@ create table if not exists public.cases (
   device_type text not null,
   brand text not null,
   model text,
-  -- Required at the application layer (lib/validation.ts / the report
-  -- form); nullable here so it never blocks a direct/manual insert, and so
-  -- this column definition matches migrations/0002 exactly for projects
-  -- that added it after cases already had rows.
-  imei text,
+  -- imei_1 is required at the application layer (lib/validation.ts / the
+  -- report form); imei_2 is always optional. Both are nullable here so a
+  -- direct/manual insert is never blocked, and so this definition matches
+  -- migrations/0004 exactly for projects that split the original single
+  -- `imei` column after cases already had rows.
+  imei_1 text,
+  imei_2 text,
   color text,
   last_seen_location text not null,
   last_seen_date date not null,
   description text not null,
   contact_email text not null,
   contact_phone text,
-  status text not null default 'open' check (status in ('open', 'found', 'closed')),
+  status text not null default 'active' check (status in ('active', 'not_active')),
+  -- Admin-only free text (e.g. "Owner contacted", "Device recovered").
+  -- Never exposed via public_case_status; RLS on this table already
+  -- restricts SELECT to admins, same as contact_email/contact_phone.
+  admin_remark text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
-  constraint cases_imei_format_check check (imei is null or imei ~ '^[0-9]{15}$')
+  constraint cases_imei_1_format_check check (imei_1 is null or imei_1 ~ '^[0-9]{15}$'),
+  constraint cases_imei_2_format_check check (imei_2 is null or imei_2 ~ '^[0-9]{15}$')
 );
 
 create index if not exists cases_created_at_idx on public.cases (created_at desc);
 create index if not exists cases_status_idx on public.cases (status);
--- Supports the admin dashboard's "search by IMEI" feature.
-create index if not exists cases_imei_idx on public.cases (imei);
+-- Support the admin dashboard's search-by-IMEI/case-ID feature.
+create index if not exists cases_imei_1_idx on public.cases (imei_1);
+create index if not exists cases_imei_2_idx on public.cases (imei_2);
 
 -- ---------------------------------------------------------------------------
 -- case_files — optional photo(s) attached to a report. Actual bytes live in

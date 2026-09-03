@@ -1,15 +1,15 @@
 import { STATUS_LABEL, type CaseStatus } from "@/lib/status";
 
+// Reuses the existing signal color tokens from tailwind.config.ts rather
+// than introducing new ones.
 const DOT_CLASS: Record<CaseStatus, string> = {
-  open: "bg-signal-open",
-  found: "bg-signal-found",
-  closed: "bg-signal-closed",
+  active: "bg-signal-found",
+  not_active: "bg-signal-closed",
 };
 
 const TEXT_CLASS: Record<CaseStatus, string> = {
-  open: "text-signal-open",
-  found: "text-signal-found",
-  closed: "text-signal-closed",
+  active: "text-signal-found",
+  not_active: "text-signal-closed",
 };
 
 export function StatusBadge({ status }: { status: CaseStatus }) {

@@ -77,26 +77,44 @@ export default function ReportPage() {
           </div>
         </div>
 
-        <div>
-          <label htmlFor="imei" className="block text-sm font-medium text-ink-950">
-            IMEI Number
-          </label>
-          <input
-            id="imei"
-            name="imei"
-            required
-            inputMode="numeric"
-            pattern="[0-9]{15}"
-            maxLength={15}
-            title="Enter exactly 15 digits, numbers only."
-            placeholder="Enter 15-digit IMEI"
-            className="mt-1.5 w-full rounded-md border border-ink-800/20 bg-white px-3 py-2 font-mono text-ink-950 placeholder:font-sans placeholder:text-ink-500/60 focus:border-flare-500 focus:outline-none"
-          />
-          {errors.imei && <p className="mt-1 text-sm text-flare-600">{errors.imei}</p>}
-          <p className="mt-1 text-xs text-ink-500">
-            Dial <span className="font-mono">*#06#</span> on the device to find its IMEI.
-          </p>
+        <div className="grid gap-6 sm:grid-cols-2">
+          <div>
+            <label htmlFor="imei_1" className="block text-sm font-medium text-ink-950">
+              IMEI 1
+            </label>
+            <input
+              id="imei_1"
+              name="imei_1"
+              required
+              inputMode="numeric"
+              pattern="[0-9]{15}"
+              maxLength={15}
+              title="Enter exactly 15 digits, numbers only."
+              placeholder="Enter 15-digit IMEI"
+              className="mt-1.5 w-full rounded-md border border-ink-800/20 bg-white px-3 py-2 font-mono text-ink-950 placeholder:font-sans placeholder:text-ink-500/60 focus:border-flare-500 focus:outline-none"
+            />
+            {errors.imei_1 && <p className="mt-1 text-sm text-flare-600">{errors.imei_1}</p>}
+          </div>
+          <div>
+            <label htmlFor="imei_2" className="block text-sm font-medium text-ink-950">
+              IMEI 2 <span className="text-ink-500">(optional, dual-SIM devices)</span>
+            </label>
+            <input
+              id="imei_2"
+              name="imei_2"
+              inputMode="numeric"
+              pattern="[0-9]{15}"
+              maxLength={15}
+              title="Enter exactly 15 digits, numbers only."
+              placeholder="Enter 15-digit IMEI"
+              className="mt-1.5 w-full rounded-md border border-ink-800/20 bg-white px-3 py-2 font-mono text-ink-950 placeholder:font-sans placeholder:text-ink-500/60 focus:border-flare-500 focus:outline-none"
+            />
+            {errors.imei_2 && <p className="mt-1 text-sm text-flare-600">{errors.imei_2}</p>}
+          </div>
         </div>
+        <p className="-mt-4 text-xs text-ink-500">
+          Dial <span className="font-mono">*#06#</span> on the device to find its IMEI(s).
+        </p>
 
         <div>
           <label htmlFor="color" className="block text-sm font-medium text-ink-950">
@@ -199,17 +217,22 @@ export default function ReportPage() {
         </div>
 
         <div>
-          <label htmlFor="photo" className="block text-sm font-medium text-ink-950">
-            Photo <span className="text-ink-500">(optional, under 5MB)</span>
+          <label htmlFor="photos" className="block text-sm font-medium text-ink-950">
+            Photos / Documents{" "}
+            <span className="text-ink-500">(optional, up to 5 files, 5MB each)</span>
           </label>
           <input
-            id="photo"
-            name="photo"
+            id="photos"
+            name="photos"
             type="file"
             accept="image/*"
+            multiple
             className="mt-1.5 w-full text-sm text-ink-700 file:mr-4 file:rounded-md file:border file:border-ink-800/20 file:bg-white file:px-3 file:py-1.5 file:text-sm file:text-ink-800 hover:file:border-ink-800/40"
           />
-          {errors.photo && <p className="mt-1 text-sm text-flare-600">{errors.photo}</p>}
+          {errors.photos && <p className="mt-1 text-sm text-flare-600">{errors.photos}</p>}
+          <p className="mt-1 text-xs text-ink-500">
+            A photo of the device, its box, or the purchase bill/invoice all help.
+          </p>
         </div>
 
         <label className="flex items-start gap-3 text-sm text-ink-700">

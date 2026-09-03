@@ -1,9 +1,11 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { CASE_ID_PATTERN, normalizeCaseId } from "@/lib/case-id";
+import { isCaseStatus } from "@/lib/status";
 
 /**
  * Deletes a case permanently. Bound to a form via
@@ -80,4 +82,67 @@ export async function deleteCase(caseId: string, _formData: FormData) {
   }
 
   redirect("/admin");
+}
+
+/**
+ * Updates a case's status (active / not_active). Bound via
+ * updateStatus.bind(null, caseId). Authorization is RLS ("admins can
+ * update cases"), same as every other admin write in this file.
+ */
+export async function updateStatus(caseId: string, formData: FormData) {
+  const normalized = normalizeCaseId(caseId);
+  if (!CASE_ID_PATTERN.test(normalized)) {
+    throw new Error("Invalid case ID.");
+  }
+
+  const status = formData.get("status");
+  if (typeof status !== "string" || !isCaseStatus(status)) {
+    throw new Error("Invalid status value.");
+  }
+
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("cases")
+    .update({ status })
+    .eq("case_id", normalized);
+
+  if (error) {
+    throw new Error(`Failed to update status: ${error.message}`);
+  }
+
+  revalidatePath(`/admin/cases/${normalized}`);
+  revalidatePath("/admin");
+}
+
+/**
+ * Saves an admin-only remark on a case (e.g. "Owner contacted"). Never
+ * visible to the public — RLS on `cases` already restricts SELECT to
+ * admins, same as contact_email/contact_phone always have been, and
+ * public_case_status never includes this column.
+ */
+export async function updateRemark(caseId: string, formData: FormData) {
+  const normalized = normalizeCaseId(caseId);
+  if (!CASE_ID_PATTERN.test(normalized)) {
+    throw new Error("Invalid case ID.");
+  }
+
+  const raw = formData.get("admin_remark");
+  const remark = typeof raw === "string" ? raw.trim() : "";
+
+  if (remark.length > 2000) {
+    throw new Error("Remark must be under 2000 characters.");
+  }
+
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("cases")
+    .update({ admin_remark: remark || null })
+    .eq("case_id", normalized);
+
+  if (error) {
+    throw new Error(`Failed to save remark: ${error.message}`);
+  }
+
+  revalidatePath(`/admin/cases/${normalized}`);
+  revalidatePath("/admin");
 }

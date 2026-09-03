@@ -12,6 +12,7 @@ export type ReportFormState = {
 };
 
 const MAX_PHOTO_BYTES = 5 * 1024 * 1024;
+const MAX_FILES = 5;
 const MAX_CASE_ID_ATTEMPTS = 5;
 const UNIQUE_VIOLATION = "23505";
 
@@ -29,7 +30,8 @@ export async function submitReport(
     device_type: formData.get("device_type"),
     brand: formData.get("brand"),
     model: formData.get("model"),
-    imei: formData.get("imei"),
+    imei_1: formData.get("imei_1"),
+    imei_2: formData.get("imei_2"),
     color: formData.get("color"),
     last_seen_location: formData.get("last_seen_location"),
     last_seen_date: formData.get("last_seen_date"),
@@ -49,21 +51,29 @@ export async function submitReport(
     return { error: "Please fix the highlighted fields.", fieldErrors };
   }
 
-  const photo = formData.get("photo");
-  const hasPhoto = photo instanceof File && photo.size > 0;
+  const rawFiles = formData.getAll("photos");
+  const files = rawFiles.filter(
+    (f): f is File => f instanceof File && f.size > 0
+  );
 
-  if (hasPhoto) {
-    const file = photo as File;
+  if (files.length > MAX_FILES) {
+    return {
+      error: "Please fix the highlighted fields.",
+      fieldErrors: { photos: `Attach at most ${MAX_FILES} files.` },
+    };
+  }
+
+  for (const file of files) {
     if (file.size > MAX_PHOTO_BYTES) {
       return {
         error: "Please fix the highlighted fields.",
-        fieldErrors: { photo: "Photo must be smaller than 5MB." },
+        fieldErrors: { photos: `"${file.name}" is over 5MB.` },
       };
     }
     if (!file.type.startsWith("image/")) {
       return {
         error: "Please fix the highlighted fields.",
-        fieldErrors: { photo: "Please upload an image file." },
+        fieldErrors: { photos: `"${file.name}" isn't an image file.` },
       };
     }
   }
@@ -97,8 +107,7 @@ export async function submitReport(
     return { error: "Something went wrong generating a case ID. Please try again." };
   }
 
-  if (hasPhoto) {
-    const file = photo as File;
+  for (const file of files) {
     const ext = file.name.split(".").pop() || "jpg";
     const path = `${caseId}/${randomUUID()}.${ext}`;
     const bytes = new Uint8Array(await file.arrayBuffer());
@@ -116,9 +125,10 @@ export async function submitReport(
         size_bytes: file.size,
       });
     } else {
-      // The case itself was created successfully; a failed photo upload
-      // shouldn't block the report. Log it for admin follow-up.
-      console.error("Photo upload failed (case was still created):", uploadError);
+      // The case itself was created successfully; a failed upload for one
+      // file shouldn't block the report or the other files. Log it for
+      // admin follow-up.
+      console.error("File upload failed (case was still created):", uploadError);
     }
   }
 

@@ -1,11 +1,14 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { CASE_ID_PATTERN, normalizeCaseId } from "@/lib/case-id";
-import { isCaseStatus, STATUS_DESCRIPTION } from "@/lib/status";
+import { isCaseStatus, STATUS_DESCRIPTION, STATUS_LABEL, type CaseStatus } from "@/lib/status";
 import { StatusBadge } from "@/components/StatusBadge";
 import { DeleteCaseButton } from "@/components/DeleteCaseButton";
-import { deleteCase } from "./actions";
+import { SubmitButton } from "@/components/SubmitButton";
+import { PhotoLightbox, type LightboxFile } from "@/components/PhotoLightbox";
+import { deleteCase, updateStatus, updateRemark } from "@/lib/case-actions";
 
 type CaseDetail = {
   id: string;
@@ -13,7 +16,8 @@ type CaseDetail = {
   device_type: string;
   brand: string;
   model: string | null;
-  imei: string | null;
+  imei_1: string | null;
+  imei_2: string | null;
   color: string | null;
   last_seen_location: string;
   last_seen_date: string;
@@ -21,15 +25,23 @@ type CaseDetail = {
   contact_email: string;
   contact_phone: string | null;
   status: string;
+  admin_remark: string | null;
   created_at: string;
   updated_at: string;
 };
 
 type CaseFile = {
   id: string;
+  storage_path: string;
   file_name: string | null;
   uploaded_at: string;
 };
+
+// Signed URLs are short-lived, scoped tokens — safe to embed directly in
+// server-rendered HTML sent to an authenticated admin's browser. This is
+// not the same as exposing the bucket publicly: each URL only grants
+// read access to one specific object, and only for this long.
+const SIGNED_URL_EXPIRY_SECONDS = 3600;
 
 function formatDateTime(value: string): string {
   return new Date(value).toLocaleString(undefined, {
@@ -61,16 +73,17 @@ export default async function AdminCaseDetailPage({
   }
 
   // RLS-gated: this only returns a row because the signed-in user passes
-  // the "admins can view all cases" policy. There's no separate PII
-  // filtering to apply here the way /case has for the public view — full
-  // detail, including contact_email/contact_phone/description/imei, is
-  // exactly what an authorized admin is meant to see.
+  // the "admins can view all cases" policy. Full detail — including
+  // contact_email/contact_phone/description/imei_1/imei_2/admin_remark —
+  // is exactly what an authorized admin is meant to see; there's no
+  // separate PII filtering to apply here the way /case has for the
+  // public view.
   const supabase = createClient();
 
   const { data: caseRow, error: caseError } = await supabase
     .from("cases")
     .select(
-      "id, case_id, device_type, brand, model, imei, color, last_seen_location, last_seen_date, description, contact_email, contact_phone, status, created_at, updated_at"
+      "id, case_id, device_type, brand, model, imei_1, imei_2, color, last_seen_location, last_seen_date, description, contact_email, contact_phone, status, admin_remark, created_at, updated_at"
     )
     .eq("case_id", caseId)
     .maybeSingle();
@@ -87,11 +100,42 @@ export default async function AdminCaseDetailPage({
 
   const { data: files } = await supabase
     .from("case_files")
-    .select("id, file_name, uploaded_at")
+    .select("id, storage_path, file_name, uploaded_at")
     .eq("case_id", record.id)
     .order("uploaded_at", { ascending: false });
 
   const caseFiles = (files ?? []) as CaseFile[];
+
+  // Signed URLs are generated here, server-side, via the service-role
+  // client — the case-uploads bucket has no anon/authenticated storage
+  // policies at all (by design; see supabase/schema.sql), so this is the
+  // one genuinely-required use of that client on this page. This only
+  // runs after requireAdmin() has already authorized the request
+  // (app/admin/layout.tsx gates every route under /admin). The resulting
+  // signed URLs — not the service-role key itself — are what reach the
+  // browser.
+  let lightboxFiles: LightboxFile[] = [];
+  if (caseFiles.length > 0) {
+    const admin = createAdminClient();
+    const signed = await Promise.all(
+      caseFiles.map(async (f) => {
+        const { data, error } = await admin.storage
+          .from("case-uploads")
+          .createSignedUrl(f.storage_path, SIGNED_URL_EXPIRY_SECONDS);
+        if (error || !data) {
+          console.error(`Failed to sign URL for ${f.storage_path}:`, error);
+          return null;
+        }
+        return {
+          id: f.id,
+          url: data.signedUrl,
+          fileName: f.file_name ?? "Unnamed file",
+          uploadedAt: f.uploaded_at,
+        };
+      })
+    );
+    lightboxFiles = signed.filter((f): f is LightboxFile => f !== null);
+  }
 
   return (
     <div className="mx-auto max-w-3xl px-6 py-10">
@@ -118,8 +162,12 @@ export default async function AdminCaseDetailPage({
 
       <dl className="mt-8 grid gap-x-8 gap-y-5 border-t border-ink-800/10 pt-6 sm:grid-cols-2">
         <div>
-          <dt className="text-xs uppercase tracking-wide text-ink-500">IMEI</dt>
-          <dd className="mt-1 font-mono text-ink-950">{record.imei ?? "Not recorded"}</dd>
+          <dt className="text-xs uppercase tracking-wide text-ink-500">IMEI 1</dt>
+          <dd className="mt-1 font-mono text-ink-950">{record.imei_1 ?? "Not recorded"}</dd>
+        </div>
+        <div>
+          <dt className="text-xs uppercase tracking-wide text-ink-500">IMEI 2</dt>
+          <dd className="mt-1 font-mono text-ink-950">{record.imei_2 ?? "—"}</dd>
         </div>
         <div>
           <dt className="text-xs uppercase tracking-wide text-ink-500">Last seen</dt>
@@ -132,6 +180,10 @@ export default async function AdminCaseDetailPage({
         <div>
           <dt className="text-xs uppercase tracking-wide text-ink-500">Filed</dt>
           <dd className="mt-1 text-ink-900">{formatDateTime(record.created_at)}</dd>
+        </div>
+        <div>
+          <dt className="text-xs uppercase tracking-wide text-ink-500">Last updated</dt>
+          <dd className="mt-1 text-ink-900">{formatDateTime(record.updated_at)}</dd>
         </div>
         <div className="sm:col-span-2">
           <dt className="text-xs uppercase tracking-wide text-ink-500">Description</dt>
@@ -147,23 +199,58 @@ export default async function AdminCaseDetailPage({
         </div>
       </dl>
 
-      {caseFiles.length > 0 && (
-        <div className="mt-8 border-t border-ink-800/10 pt-6">
-          <h2 className="text-xs uppercase tracking-wide text-ink-500">
-            Attached files ({caseFiles.length})
-          </h2>
-          <ul className="mt-2 space-y-1 text-sm text-ink-800">
-            {caseFiles.map((f) => (
-              <li key={f.id}>
-                {f.file_name ?? "Unnamed file"} — {formatDateTime(f.uploaded_at)}
-              </li>
+      {/* Photos / Documents */}
+      <div id="photos" className="mt-8 scroll-mt-6 border-t border-ink-800/10 pt-6">
+        <h2 className="text-xs uppercase tracking-wide text-ink-500">
+          Photos / Documents ({lightboxFiles.length})
+        </h2>
+        {lightboxFiles.length === 0 ? (
+          <p className="mt-2 text-sm text-ink-600">No files were attached to this report.</p>
+        ) : (
+          <div className="mt-3">
+            <PhotoLightbox files={lightboxFiles} />
+          </div>
+        )}
+      </div>
+
+      {/* Status */}
+      <div className="mt-8 border-t border-ink-800/10 pt-6">
+        <h2 className="text-xs uppercase tracking-wide text-ink-500">Status</h2>
+        <form
+          action={updateStatus.bind(null, record.case_id)}
+          className="mt-3 flex flex-wrap items-center gap-3"
+        >
+          <select
+            name="status"
+            defaultValue={record.status}
+            className="rounded-md border border-ink-800/20 bg-white px-3 py-2 text-sm text-ink-950 focus:border-flare-500 focus:outline-none"
+          >
+            {(["active", "not_active"] as CaseStatus[]).map((s) => (
+              <option key={s} value={s}>
+                {STATUS_LABEL[s]}
+              </option>
             ))}
-          </ul>
-          <p className="mt-2 text-xs text-ink-500">
-            Signed-URL viewing of attached files ships in Phase 2.
-          </p>
-        </div>
-      )}
+          </select>
+          <SubmitButton pendingLabel="Updating…">Update status</SubmitButton>
+        </form>
+      </div>
+
+      {/* Admin remark */}
+      <div className="mt-8 border-t border-ink-800/10 pt-6">
+        <h2 className="text-xs uppercase tracking-wide text-ink-500">
+          Admin remark <span className="normal-case text-ink-400">(not visible to the public)</span>
+        </h2>
+        <form action={updateRemark.bind(null, record.case_id)} className="mt-3 space-y-3">
+          <textarea
+            name="admin_remark"
+            rows={3}
+            defaultValue={record.admin_remark ?? ""}
+            placeholder="Police complaint verified, owner contacted, device recovered…"
+            className="w-full rounded-md border border-ink-800/20 bg-white px-3 py-2 text-sm text-ink-950 placeholder:text-ink-500/60 focus:border-flare-500 focus:outline-none"
+          />
+          <SubmitButton pendingLabel="Saving…">Save remark</SubmitButton>
+        </form>
+      </div>
 
       <div className="mt-10 border-t border-ink-800/10 pt-6">
         <form action={deleteCase.bind(null, record.case_id)}>
