@@ -23,6 +23,7 @@ type CaseRow = {
 
 const STATUS_FILTERS: Array<{ value: "all" | CaseStatus; label: string }> = [
   { value: "all", label: "All" },
+  { value: "pending", label: "Pending" },
   { value: "active", label: "Active" },
   { value: "not_active", label: "Not Active" },
 ];
@@ -49,9 +50,12 @@ export default async function AdminDashboardPage({
   const rawQuery = (searchParams.q ?? "").trim();
   // Strip characters that would break PostgREST's .or() filter syntax.
   const safeQuery = rawQuery.replace(/[,()]/g, "").trim();
-  const statusFilter = searchParams.status === "active" || searchParams.status === "not_active"
-    ? searchParams.status
-    : "all";
+  const statusFilter =
+    searchParams.status === "pending" ||
+    searchParams.status === "active" ||
+    searchParams.status === "not_active"
+      ? searchParams.status
+      : "all";
 
   const supabase = createClient();
   let query = supabase

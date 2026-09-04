@@ -3,12 +3,13 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { CASE_ID_PATTERN, normalizeCaseId } from "@/lib/case-id";
-import { isCaseStatus, STATUS_DESCRIPTION, STATUS_LABEL, type CaseStatus } from "@/lib/status";
+import { isCaseStatus, STATUS_DESCRIPTION } from "@/lib/status";
 import { StatusBadge } from "@/components/StatusBadge";
 import { DeleteCaseButton } from "@/components/DeleteCaseButton";
-import { SubmitButton } from "@/components/SubmitButton";
+import { StatusUpdateForm } from "@/components/StatusUpdateForm";
+import { RemarkForm } from "@/components/RemarkForm";
 import { PhotoLightbox, type LightboxFile } from "@/components/PhotoLightbox";
-import { deleteCase, updateStatus, updateRemark } from "@/lib/case-actions";
+import { deleteCase } from "@/lib/case-actions";
 
 type CaseDetail = {
   id: string;
@@ -216,23 +217,9 @@ export default async function AdminCaseDetailPage({
       {/* Status */}
       <div className="mt-8 border-t border-ink-800/10 pt-6">
         <h2 className="text-xs uppercase tracking-wide text-ink-500">Status</h2>
-        <form
-          action={updateStatus.bind(null, record.case_id)}
-          className="mt-3 flex flex-wrap items-center gap-3"
-        >
-          <select
-            name="status"
-            defaultValue={record.status}
-            className="rounded-md border border-ink-800/20 bg-white px-3 py-2 text-sm text-ink-950 focus:border-flare-500 focus:outline-none"
-          >
-            {(["active", "not_active"] as CaseStatus[]).map((s) => (
-              <option key={s} value={s}>
-                {STATUS_LABEL[s]}
-              </option>
-            ))}
-          </select>
-          <SubmitButton pendingLabel="Updating…">Update status</SubmitButton>
-        </form>
+        {isCaseStatus(record.status) && (
+          <StatusUpdateForm caseId={record.case_id} currentStatus={record.status} />
+        )}
       </div>
 
       {/* Admin remark */}
@@ -240,16 +227,7 @@ export default async function AdminCaseDetailPage({
         <h2 className="text-xs uppercase tracking-wide text-ink-500">
           Admin remark <span className="normal-case text-ink-400">(not visible to the public)</span>
         </h2>
-        <form action={updateRemark.bind(null, record.case_id)} className="mt-3 space-y-3">
-          <textarea
-            name="admin_remark"
-            rows={3}
-            defaultValue={record.admin_remark ?? ""}
-            placeholder="Police complaint verified, owner contacted, device recovered…"
-            className="w-full rounded-md border border-ink-800/20 bg-white px-3 py-2 text-sm text-ink-950 placeholder:text-ink-500/60 focus:border-flare-500 focus:outline-none"
-          />
-          <SubmitButton pendingLabel="Saving…">Save remark</SubmitButton>
-        </form>
+        <RemarkForm caseId={record.case_id} currentRemark={record.admin_remark} />
       </div>
 
       <div className="mt-10 border-t border-ink-800/10 pt-6">

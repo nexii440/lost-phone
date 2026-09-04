@@ -84,20 +84,35 @@ export async function deleteCase(caseId: string, _formData: FormData) {
   redirect("/admin");
 }
 
+export type CaseUpdateState = {
+  success?: boolean;
+  error?: string;
+};
+
 /**
- * Updates a case's status (active / not_active). Bound via
- * updateStatus.bind(null, caseId). Authorization is RLS ("admins can
- * update cases"), same as every other admin write in this file.
+ * Updates a case's status (pending / active / not_active). Bound via
+ * updateStatus.bind(null, caseId), which — combined with useFormState —
+ * gives the form component (prevState, formData) => state, matching what
+ * useFormState expects while still knowing which case to update.
+ * Authorization is RLS ("admins can update cases"), same as every other
+ * admin write in this file. Unlike deleteCase, failures here are
+ * returned as state rather than thrown: this is a routine, in-place edit
+ * with its own inline success/error UI, not a destructive action that
+ * warrants a full error-page interruption.
  */
-export async function updateStatus(caseId: string, formData: FormData) {
+export async function updateStatus(
+  caseId: string,
+  _prevState: CaseUpdateState,
+  formData: FormData
+): Promise<CaseUpdateState> {
   const normalized = normalizeCaseId(caseId);
   if (!CASE_ID_PATTERN.test(normalized)) {
-    throw new Error("Invalid case ID.");
+    return { error: "Invalid case ID." };
   }
 
   const status = formData.get("status");
   if (typeof status !== "string" || !isCaseStatus(status)) {
-    throw new Error("Invalid status value.");
+    return { error: "Invalid status value." };
   }
 
   const supabase = createClient();
@@ -107,30 +122,36 @@ export async function updateStatus(caseId: string, formData: FormData) {
     .eq("case_id", normalized);
 
   if (error) {
-    throw new Error(`Failed to update status: ${error.message}`);
+    return { error: `Failed to update status: ${error.message}` };
   }
 
   revalidatePath(`/admin/cases/${normalized}`);
   revalidatePath("/admin");
+  return { success: true };
 }
 
 /**
  * Saves an admin-only remark on a case (e.g. "Owner contacted"). Never
  * visible to the public — RLS on `cases` already restricts SELECT to
  * admins, same as contact_email/contact_phone always have been, and
- * public_case_status never includes this column.
+ * public_case_status never includes this column. Same
+ * useFormState-compatible pattern as updateStatus.
  */
-export async function updateRemark(caseId: string, formData: FormData) {
+export async function updateRemark(
+  caseId: string,
+  _prevState: CaseUpdateState,
+  formData: FormData
+): Promise<CaseUpdateState> {
   const normalized = normalizeCaseId(caseId);
   if (!CASE_ID_PATTERN.test(normalized)) {
-    throw new Error("Invalid case ID.");
+    return { error: "Invalid case ID." };
   }
 
   const raw = formData.get("admin_remark");
   const remark = typeof raw === "string" ? raw.trim() : "";
 
   if (remark.length > 2000) {
-    throw new Error("Remark must be under 2000 characters.");
+    return { error: "Remark must be under 2000 characters." };
   }
 
   const supabase = createClient();
@@ -140,9 +161,10 @@ export async function updateRemark(caseId: string, formData: FormData) {
     .eq("case_id", normalized);
 
   if (error) {
-    throw new Error(`Failed to save remark: ${error.message}`);
+    return { error: `Failed to save remark: ${error.message}` };
   }
 
   revalidatePath(`/admin/cases/${normalized}`);
   revalidatePath("/admin");
+  return { success: true };
 }

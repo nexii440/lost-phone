@@ -5,9 +5,10 @@
 --
 -- Already ran this once against a project that has data in it? This file's
 -- `create table if not exists` won't retroactively add new columns to an
--- existing table (e.g. `imei_1`/`imei_2`/`admin_remark`, or the
--- active/not_active status rename) — run the numbered files in
--- supabase/migrations/ in order instead.
+-- existing table (e.g. `imei_1`/`imei_2`/`admin_remark`, the
+-- active/not_active status rename, or the later addition of the
+-- 'pending' status) — run the numbered files in supabase/migrations/ in
+-- order instead.
 
 create extension if not exists pgcrypto;
 
@@ -47,7 +48,7 @@ create table if not exists public.cases (
   description text not null,
   contact_email text not null,
   contact_phone text,
-  status text not null default 'active' check (status in ('active', 'not_active')),
+  status text not null default 'pending' check (status in ('pending', 'active', 'not_active')),
   -- Admin-only free text (e.g. "Owner contacted", "Device recovered").
   -- Never exposed via public_case_status; RLS on this table already
   -- restricts SELECT to admins, same as contact_email/contact_phone.
